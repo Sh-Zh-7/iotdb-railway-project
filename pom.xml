@@ -2,9 +2,9 @@
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.cgn</groupId>
-  <artifactId>csv_to_tsfile</artifactId>
+  <artifactId>tsfile_converter</artifactId>
   <version>1.0-SNAPSHOT</version>
-  <name>Archetype - csv_to_tsfile</name>
+  <name>Archetype - tsfile_converter</name>
   <url>http://maven.apache.org</url>
   <dependencies>
     <dependency>
