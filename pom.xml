@@ -47,6 +47,7 @@
         <executions>
           <execution>
             <configuration>
+              <finalName>csv_to_tsfile</finalName>
               <archive>
                 <manifest>
                   <mainClass>org.cgn.csv.FileWatcher</mainClass>
@@ -56,7 +57,25 @@
                 <descriptorRef>jar-with-dependencies</descriptorRef>
               </descriptorRefs>
             </configuration>
-            <id>make-assembly</id>
+            <id>make-assembly1</id>
+            <phase>package</phase>
+            <goals>
+              <goal>single</goal>
+            </goals>
+          </execution>
+          <execution>
+            <configuration>
+              <finalName>bin_to_tsfile</finalName>
+              <archive>
+                <manifest>
+                  <mainClass>org.cgn.binary.FileWatcher</mainClass>
+                </manifest>
+              </archive>
+              <descriptorRefs>
+                <descriptorRef>jar-with-dependencies</descriptorRef>
+              </descriptorRefs>
+            </configuration>
+            <id>make-assembly2</id>
             <phase>package</phase>
             <goals>
               <goal>single</goal>
