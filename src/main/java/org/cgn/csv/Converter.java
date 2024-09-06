@@ -5,7 +5,9 @@ import org.apache.iotdb.rpc.IoTDBConnectionException;
 import org.apache.iotdb.rpc.StatementExecutionException;
 import org.apache.iotdb.session.Session;
 import org.apache.iotdb.tsfile.exception.write.WriteProcessException;
+import org.apache.iotdb.tsfile.file.metadata.enums.CompressionType;
 import org.apache.iotdb.tsfile.file.metadata.enums.TSDataType;
+import org.apache.iotdb.tsfile.file.metadata.enums.TSEncoding;
 import org.apache.iotdb.tsfile.read.common.Path;
 import org.apache.iotdb.tsfile.write.TsFileWriter;
 import org.apache.iotdb.tsfile.write.record.Tablet;
@@ -69,7 +71,7 @@ public class Converter {
             String line;
             while ((line = bufferedReader.readLine()) != null) {
               // Each line is a new measurement
-              MeasurementSchema measurementSchema = new MeasurementSchema("s_" + count, TSDataType.INT32);
+              MeasurementSchema measurementSchema = new MeasurementSchema("s_" + count, TSDataType.INT32, TSEncoding.PLAIN, CompressionType.ZSTD);
               schemas.add(measurementSchema);
 
               // Each column stands for different timestamp
@@ -121,9 +123,9 @@ public class Converter {
           transformToRow(zipFile.getName(), timestamps, tabletValues, datapointCount, measurementCount);
         }
 
-//        if (tablet.rowSize!= 0) {
-//          tsFileWriter.write(tablet);
-//        }
+        if (tablet.rowSize != 0) {
+          tsFileWriter.write(tablet);
+        }
         tablet.reset();
       } catch (WriteProcessException e) {
         throw new RuntimeException(e);
@@ -140,44 +142,43 @@ public class Converter {
   // Transform (time, s1, s2, s3, ...) to (time, s_all)
   public static void transformToRow(String filename, long[] timestamps, Object[] objects, int datapointCount, int measurementCount) {
     List<MeasurementSchema> measurementSchemas = new ArrayList<>();
-    measurementSchemas.add(new MeasurementSchema("s_value", TSDataType.INT32));
-    // Time and s_all
-    Tablet row = new Tablet(dbAllPrefix, measurementSchemas, measurementCount);
+    measurementSchemas.add(new MeasurementSchema("s_value", TSDataType.INT32, TSEncoding.PLAIN, CompressionType.ZSTD));
 
-    // Transform each row to (time, s_all) series
-    for (int i = 0; i < datapointCount; i++) {
-      // For each row in origin tablet, create new TsFile
-      File recordFile = new File(filename + ".row.tsfile");
-      try (TsFileWriter recordFileWriter = new TsFileWriter(recordFile)) {
-        recordFileWriter.registerTimeseries(new Path(dbAllPrefix), measurementSchemas);
-        long[] rowTime = row.timestamps;
-        Object[] rowValue = row.values;
-        long recordStartTime = timestamps[i];
+    File recordFile = new File(filename + ".T.tsfile");
+    try (TsFileWriter recordFileWriter = new TsFileWriter(recordFile)) {
+      recordFileWriter.registerTimeseries(new Path(dbAllPrefix), measurementSchemas);
 
-        // Increase origin row's time as new tablet's rows' time
+      Tablet transpose = new Tablet(dbAllPrefix, measurementSchemas, measurementCount * datapointCount);
+      long[] times = transpose.timestamps;
+      int[] values = (int[]) transpose.values[0];
+
+      int index = 0;
+      long gap = 70_000_000 / measurementCount;
+      for (int i = 0; i < datapointCount; i++) {
         for (int j = 0; j < measurementCount; j++) {
-          rowTime[j] = ++recordStartTime;
-        }
-        // Fill datapoint value with origin measurements
-        int[] value = (int[]) rowValue[0];
-        for (int j = 0; j < measurementCount; j++) {
-          int[] oneRow = (int[]) objects[j];
-          value[j] = oneRow[i];
-        }
+          if (j == 0) {
+            times[index] = timestamps[i];
+          } else {
+            times[index] = times[index - 1] + gap;
+          }
 
-        row.rowSize = measurementCount;
-        recordFileWriter.write(row);
-        recordFileWriter.flushAllChunkGroups();
-        row.reset();
-      } catch (Exception e) {
-        e.printStackTrace();
+          values[index] = ((int[]) objects[j])[i];
+          index++;
+        }
       }
 
-      try {
-        session.executeNonQueryStatement(String.format("load '%s' onSuccess=delete", recordFile.getAbsolutePath()));
-      } catch (IoTDBConnectionException | StatementExecutionException e) {
-        throw new RuntimeException(e);
-      }
+      transpose.rowSize = measurementCount * datapointCount;
+      recordFileWriter.write(transpose);
+      recordFileWriter.flushAllChunkGroups();
+      transpose.reset();
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+
+    try {
+      session.executeNonQueryStatement(String.format("load '%s' onSuccess=delete", recordFile.getAbsolutePath()));
+    } catch (IoTDBConnectionException | StatementExecutionException e) {
+      throw new RuntimeException(e);
     }
   }
 

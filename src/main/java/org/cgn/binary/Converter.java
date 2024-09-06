@@ -103,7 +103,7 @@ public class Converter {
     }
 
     try {
-      session.executeNonQueryStatement(String.format("load '%s'", tsfile.getAbsolutePath()));
+      session.executeNonQueryStatement(String.format("load '%s' onSuccess=delete", tsfile.getAbsolutePath()));
     } catch (IoTDBConnectionException | StatementExecutionException e) {
       throw new RuntimeException(e);
     }
@@ -116,7 +116,7 @@ public class Converter {
     measurementSchemas.add(new MeasurementSchema("s_phase", TSDataType.INT32, TSEncoding.PLAIN, CompressionType.LZMA2));
 
 
-    File recordFile = new File(filename + ".row.tsfile");
+    File recordFile = new File(filename + ".T.tsfile");
     try (TsFileWriter recordFileWriter = new TsFileWriter(recordFile)) {
       recordFileWriter.registerTimeseries(new Path(dbAllPrefix), measurementSchemas);
 
@@ -151,7 +151,7 @@ public class Converter {
     }
 
     try {
-      session.executeNonQueryStatement(String.format("load '%s'", recordFile.getAbsolutePath()));
+      session.executeNonQueryStatement(String.format("load '%s' onSuccess=delete", recordFile.getAbsolutePath()));
     } catch (IoTDBConnectionException | StatementExecutionException e) {
       throw new RuntimeException(e);
     }
